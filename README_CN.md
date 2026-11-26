@@ -284,6 +284,8 @@ api.cunmap('<Ctrl-d>', /example\.com/);
 
 按模式保留指定快捷键时，使用 `nunmapAllExcept`（Normal）、`iunmapAllExcept`（Insert）、`vunmapAllExcept`（Visual）、`cunmapAllExcept`（Omnibar）或 `lunmapAllExcept`（Lurk）。这些接口接受要保留的按键数组及可选的网址正则，传入空数组可清除该模式的快捷键映射。`unmapAllExcept` 仍同时作用于 Normal 和 Insert。
 
+`cunmapAllExcept` 同时筛选搜索栏打开后的快捷键，以及 Normal 和 Visual 模式中打开搜索栏的绑定。例如要保留用 `go` 打开搜索栏并允许按 Esc 关闭，可设置 `api.cunmapAllExcept(['go', '<Esc>'])`。自定义的打开搜索栏快捷键可以在 `mapkey` 或 `vmapkey` 的选项中加上 `opensOmnibar: true`，一起纳入白名单筛选。
+
 ### 添加书签
 `ab`可以把当前页加入书签。按`ab`后，搜索栏会弹出来让你选择放到哪个目录。如果你希望放到一个新建目录下面，可以输入新的目录名，**并以`/`结尾**，比如我选中了`/Bookmarks Bar/tool/`，然后在后面输入`abc/`，会把当前页加到`/Bookmarks Bar/tool/abc/`这个目录里。如果`abc`后面没有`/`，`abc`会被当作新建书签的标题保存。
 

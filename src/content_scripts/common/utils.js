@@ -920,8 +920,13 @@ function mapInMode(mode, nks, oks, new_annotation, replace = false) {
     return true;
 }
 
-function unmapInMode(mode, keystrokes) {
+function unmapInMode(mode, keystrokes, keep) {
     const mappings = new Trie();
+    if (keep) {
+        for (const meta of mode.mappings.getMetas(keep)) {
+            mappings.add(meta.word, meta);
+        }
+    }
     for (const keystroke of keystrokes || []) {
         const key = KeyboardUtils.encodeKeystroke(keystroke);
         const meta = mode.mappings.find(key)?.meta;

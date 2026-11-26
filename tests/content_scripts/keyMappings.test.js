@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import createAPI from '../../src/content_scripts/common/api.js';
+import createDefaultMappings from '../../src/content_scripts/common/default.js';
 import createNormal from '../../src/content_scripts/common/normal.js';
 import KeyboardUtils from '../../src/content_scripts/common/keyboardUtils';
 import Trie from '../../src/content_scripts/common/trie';
@@ -67,6 +68,37 @@ test('Lurk configuration is applied in order before the mode starts', () => {
     lurk.exit();
 });
 
+test('Omnibar allowlist filters the default launch shortcuts without clearing unrelated keys', () => {
+    global.chrome = {storage: {local: {get: jest.fn()}}};
+    const normal = createMode('Normal', []);
+    const visual = createMode('Visual', []);
+    const insert = createMode('Insert', []);
+    const front = {openOmnibar: jest.fn()};
+    const api = createAPI({}, insert, normal, {}, visual, front, {});
+    const userAgent = jest.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Chrome');
+    createDefaultMappings(api, {}, insert, normal, {}, visual, front, {});
+    userAgent.mockRestore();
+    const allowlist = [
+        'go', 'og', ':', 'b', '<Ctrl-.>', '<Ctrl-,>', '<Esc>', '<Tab>',
+        '<Shift-Tab>', '<ArrowDown>', '<ArrowUp>',
+    ];
+
+    api.cunmapAllExcept(allowlist, /another-site/);
+    expect(keys(normal)).toEqual(expect.arrayContaining(['t', 'A']));
+    api.cunmapAllExcept(allowlist);
+
+    for (const key of ['go', 'og', ':', 'b']) {
+        normal.mappings.find(key).meta.code();
+    }
+    expect(front.openOmnibar.mock.calls.map(([options]) => options.type))
+        .toEqual(['URLs', 'SearchEngine', 'Commands', 'Bookmarks']);
+    expect(keys(normal)).not.toContain('t');
+    expect(keys(normal)).not.toContain('A');
+    expect(keys(visual)).not.toContain('A');
+    expect(keys(normal)).toEqual(expect.arrayContaining(['r', 'sg']));
+    expect(keys(visual)).toContain('t');
+});
+
 test('Omnibar runs a moved Escape command and honors single and allowlist removals', () => {
     global.chrome = {
         runtime: {
@@ -79,7 +111,7 @@ test('Omnibar runs a moved Escape command and honors single and allowlist remova
     document.body.innerHTML = new DOMParser().parseFromString(html, 'text/html').body.innerHTML;
     const frontend = require('../../src/content_scripts/ui/frontend.js').default;
     frontend._actions.initFrontend({origin: window.origin, winSize: [800, 600]});
-    const api = createAPI({}, {}, {}, {}, {}, {}, {});
+    const api = createAPI({}, {}, createMode("Normal", []), {}, createMode("Visual", []), {}, {});
     const commands = {
         addMapkey: (mode, new_keystroke, old_keystroke, new_annotation, replace) => {
             frontend._actions.addMapkey({mode, new_keystroke, old_keystroke, new_annotation, replace});

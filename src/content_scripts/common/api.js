@@ -70,6 +70,9 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
                 }
             }
             var keybound = createKeyTarget(jscode, {annotation: annotation, feature_group: ((mode === visual) ? 9 :14)}, options.repeatIgnore);
+            if (options.opensOmnibar) {
+                keybound.opensOmnibar = true;
+            }
             mode.mappings.add(keys, keybound);
         }
     }
@@ -220,8 +223,15 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
         }
     }
 
+    /**
+     * Keep only the specified Omnibar bindings and shortcuts that open the Omnibar.
+     * Normal and Visual mapkey options can identify custom launchers with opensOmnibar.
+     */
     function cunmapAllExcept(keystrokes, domain) {
         if (_isDomainApplicable(domain)) {
+            const keepNonLaunchers = mapping => !mapping.opensOmnibar;
+            unmapInMode(normal, keystrokes, keepNonLaunchers);
+            unmapInMode(visual, keystrokes, keepNonLaunchers);
             dispatchSKEvent("front", ['unmapAllExcept', "Omnibar", keystrokes]);
         }
     }
@@ -368,7 +378,7 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
         mapkey((search_leader_key || 's') + alias, ['#6Search selected with {0}', prompt], ssw);
         mapkey('o' + alias, ['#8Open Omnibar for {0} Search', prompt], () => {
             front.openOmnibar({type: "SearchEngine", extra: alias});
-        });
+        }, {opensOmnibar: true});
         vmapkey((search_leader_key || 's') + alias, '', ssw);
         function ssw2() {
             searchSelectedWith(search_url, true);
@@ -381,13 +391,13 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
             function ssw4() {
                 searchSelectedWith(search_url, false, true, alias);
             }
-            mapkey((search_leader_key || 's') + capitalAlias, '', ssw4);
-            vmapkey((search_leader_key || 's') + capitalAlias, '', ssw4);
+            mapkey((search_leader_key || 's') + capitalAlias, '', ssw4, {opensOmnibar: true});
+            vmapkey((search_leader_key || 's') + capitalAlias, '', ssw4, {opensOmnibar: true});
             function ssw5() {
                 searchSelectedWith(search_url, true, true, alias);
             }
-            mapkey((search_leader_key || 's') + (only_this_site_key || 'o') + capitalAlias, '', ssw5);
-            vmapkey((search_leader_key || 's') + (only_this_site_key || 'o') + capitalAlias, '', ssw5);
+            mapkey((search_leader_key || 's') + (only_this_site_key || 'o') + capitalAlias, '', ssw5, {opensOmnibar: true});
+            vmapkey((search_leader_key || 's') + (only_this_site_key || 'o') + capitalAlias, '', ssw5, {opensOmnibar: true});
         }
     }
 

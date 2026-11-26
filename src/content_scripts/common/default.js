@@ -46,7 +46,7 @@ export default function(api, clipboard, insert, normal, hints, visual, front, br
     });
     mapkey('Q', '#8Open omnibar for word translation', function() {
         front.openOmniquery({query: getWordUnderCursor(), style: "opacity: 0.8;"});
-    });
+    }, {opensOmnibar: true});
     imapkey("<Ctrl-'>", '#15Toggle quotes in an input element', toggleQuote);
     function openVim(useNeovim) {
         var element = getRealEdit();
@@ -615,18 +615,18 @@ export default function(api, clipboard, insert, normal, hints, visual, front, br
 
     mapkey('H', '#8Open opened URL in current tab', function() {
         front.openOmnibar({type: "TabURLs"});
-    });
+    }, {opensOmnibar: true});
     mapkey('om', '#8Open URL from vim-like marks', function() {
         front.openOmnibar({type: "VIMarks"});
-    });
+    }, {opensOmnibar: true});
     mapkey(':', '#8Open commands', function() {
         front.openOmnibar({type: "Commands"});
-    });
+    }, {opensOmnibar: true});
     mapkey('A', '#8Open llm chat', function() {
         // the page is not sent along: the model asks for it with `read_page` when a
         // question actually needs it, so a chat that never needs it never pays for it
         front.openOmnibar({type: "LLMChat"});
-    });
+    }, {opensOmnibar: true});
     vmapkey('A', '#8Open llm chat', function() {
         front.openOmnibar({type: "LLMChat", extra: {
             // what the user pointed at, so `read_page` serves this instead of the
@@ -635,7 +635,7 @@ export default function(api, clipboard, insert, normal, hints, visual, front, br
             // selection over a list of links is mostly the links.
             picked: selectionToMarkdown()
         }});
-    });
+    }, {opensOmnibar: true});
     mapkey('yi', '#7Yank text of an input', function() {
         hints.create("input, textarea, select", function(element) {
             clipboard.write(element.value);
@@ -978,37 +978,37 @@ export default function(api, clipboard, insert, normal, hints, visual, front, br
     if (!getBrowserName().startsWith("Safari")) {
         mapkey('t', '#8Open a URL', function() {
             front.openOmnibar({type: "URLs"});
-        });
+        }, {opensOmnibar: true});
         mapkey('go', '#8Open a URL in current tab', function() {
             front.openOmnibar({type: "URLs", tabbed: false});
-        });
+        }, {opensOmnibar: true});
         mapkey('ox', '#8Open recently closed URL', function() {
             front.openOmnibar({type: "RecentlyClosed"});
-        });
+        }, {opensOmnibar: true});
         mapkey('b', '#8Open a bookmark', function() {
             front.openOmnibar(({type: "Bookmarks"}));
-        });
+        }, {opensOmnibar: true});
         mapkey(';x', '#3Close tabs by URL', function() {
             front.openOmnibar({type: "CloseTabs"});
-        });
+        }, {opensOmnibar: true});
         mapkey('ab', '#8Bookmark current page to selected folder', function() {
             var page = {
                 url: window.location.href,
                 title: document.title
             };
             front.openOmnibar(({type: "AddBookmark", extra: page}));
-        });
+        }, {opensOmnibar: true});
         mapkey('oh', '#8Open URL from history', function() {
             front.openOmnibar({type: "History"});
-        });
+        }, {opensOmnibar: true});
         mapkey('W', '#3Move current tab to another window',  function() {
             front.openOmnibar(({type: "Windows"}));
-        });
+        }, {opensOmnibar: true});
         mapkey(';gt', '#3Gather filtered tabs into current window', function() {
             front.openOmnibar({type: "Tabs", extra: {
                 action: "gather"
             }});
-        });
+        }, {opensOmnibar: true});
         mapkey(';gw', '#3Gather all tabs into current window',  function() {
             RUNTIME("gatherWindows");
         });
