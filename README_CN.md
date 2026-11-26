@@ -161,6 +161,22 @@ Surfingkeys有三种模式：normal，visual和insert。
 
     settings.hintAlign = "left";
 
+#### 按类型显示提示
+
+在高级设置中加入以下配置后，按 `f` 时只显示第一组有候选的提示。按 Tab 切换到下一组，最后一组之后回到第一组。状态栏显示当前类别及切换键。
+
+```js
+settings.hintGroupByType = true;
+settings.hintTypeOrder = ['link', 'input', 'select', 'image', 'other'];
+settings.hintNextTypeKey = '<Tab>';
+settings.hintPriorityCharacters = 'asdfg';
+```
+
+- 类别依次为链接、输入控件、选择框、图片和其他可选元素。调整数组顺序可改变优先级，省略的类别会排在末尾，空组自动跳过。
+- `hintGroupByType` 默认关闭，一次显示全部候选。自定义 `api.Hints.create` 可以用 `{groupByType: false}` 或 `{groupByType: true}` 覆盖单次调用。
+- 设置 `hintPriorityCharacters` 后，元素提示以小写显示，靠近当前候选焦点或视口中心的元素优先获得较短的标签。该字符串只重排现有提示字符。设为 `''` 使用原来的分配规则，数字提示仍使用数字。
+- 切换键可设为例如 `'<Ctrl-ArrowRight>'`。若与标签字符或 Esc、空格、退格冲突，则使用 Tab。分类和优先标签适用于元素提示，文本定位和输入框遮罩保持原有操作。
+
 #### Regional Hints mode
 
 按`L`键选择一个大块元素进入Regional Hints mode，目前自带的操作有

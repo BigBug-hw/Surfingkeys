@@ -2,6 +2,7 @@ import { RUNTIME, dispatchSKEvent, runtime } from './runtime.js';
 import Mode from './mode';
 import KeyboardUtils from './keyboardUtils';
 import Trie from './trie';
+import { generatePriorityLabels, groupHintTargets, hintTypes } from './hintLabels.js';
 import toMarkdown from './pageMarkdown.js';
 import {
     createElementWithContent,
@@ -204,6 +205,9 @@ div:empty {
 [mode=text] div {
     background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#aaa), color-stop(100%,#fff));
 }
+[priority-labels] div {
+    text-transform: lowercase;
+}
 div.hint-scrollable {
     background: rgba(170, 170, 255, 0.85);
 }
@@ -296,6 +300,9 @@ div.hint-scrollable {
         const hints = holder.querySelectorAll('div');
         if (Mode.isSpecialKeyOf("<Esc>", event.sk_keyName)) {
             hide();
+        } else if (typeGroups.length > 1 && event.sk_keyName === nextTypeKey) {
+            showTypeGroup((typeIndex + 1) % typeGroups.length);
+            Mode.showStatus();
         } else if (event.keyCode === KeyboardUtils.keyCodes.space) {
             holder.style.display = "none";
         } else if (event.keyCode === KeyboardUtils.keyCodes.shiftKey) {
@@ -456,6 +463,7 @@ div.hint-scrollable {
     var _lastCreateAttrs = {},
         _onHintKey = self.dispatchMouseClick,
         _cssSelector = "";
+    let typeGroups = [], typeIndex = 0, nextTypeKey = "", clickStatus = "";
 
     function isCapital(key) {
         return key === key.toUpperCase() &&
@@ -477,7 +485,8 @@ div.hint-scrollable {
         const hintState = refreshHints(hints, prefix);
         const elm = hintState.matched;
         if (elm) {
-            normal.appendKeysForRepeat("Hints", prefix);
+            const type = typeGroups[typeIndex]?.[0];
+            normal.appendKeysForRepeat("Hints", type ? `${type}:${prefix}` : prefix);
             if (typeof(_onHintKey) === 'function') {
                 if (behaviours.regionalHints) {
                     setTimeout(() => {
@@ -554,11 +563,16 @@ div.hint-scrollable {
         textFilter = "";
         shiftKey = false;
         altKey = false;
+        typeGroups = [];
+        typeIndex = 0;
         self.exit();
     }
 
     function flip() {
         var hints = holder.querySelectorAll('div');
+        if (!hints.length) {
+            return;
+        }
         if (hints[0].style.zIndex == hints[0].zIndex) {
             hints.forEach(function(hint, i) {
                 var z = parseInt(hint.style.zIndex);
@@ -580,6 +594,8 @@ div.hint-scrollable {
         if (found > 0) {
             self.statusLine += " - " + (new Date().getTime() - start) + "ms / " + found;
             Mode.showStatus();
+        } else {
+            hide();
         }
     }
 
@@ -723,6 +739,7 @@ div.hint-scrollable {
     function _initHolder(mode) {
         setSanitizedContent(holder, "");
         holder.setAttribute('mode', mode);
+        holder.removeAttribute('priority-labels');
         holder.style.display = "";
     }
 
@@ -748,7 +765,26 @@ div.hint-scrollable {
 
     function placeHints(elements) {
         _initHolder('click');
-        const hintLabels = self.genLabels(elements.length);
+        const rects = elements.map(getRealRect);
+        const preferred = runtime.conf.hintPriorityCharacters;
+        const priorityLabels = !numeric && typeof preferred === "string" && preferred
+            ? generatePriorityLabels(elements.length, characters, preferred) : null;
+        let hintLabels;
+        if (priorityLabels) {
+            holder.setAttribute('priority-labels', '');
+            const focused = document.activeElement;
+            const focusRect = rects[elements.indexOf(focused)];
+            const x = focusRect ? focusRect.left + focusRect.width / 2 : window.innerWidth / 2;
+            const y = focusRect ? focusRect.top + focusRect.height / 2 : window.innerHeight / 2;
+            const ranked = rects.map((rect, index) => ({
+                index,
+                distance: (rect.left + rect.width / 2 - x) ** 2 + (rect.top + rect.height / 2 - y) ** 2,
+            })).sort((left, right) => left.distance - right.distance);
+            hintLabels = [];
+            ranked.forEach(({index}, rank) => { hintLabels[index] = priorityLabels[rank]; });
+        } else {
+            hintLabels = self.genLabels(elements.length);
+        }
         const bof = self.coordinate();
         const style = createElementWithContent("style", _styleForClick);
         holder.prepend(style);
@@ -760,7 +796,7 @@ div.hint-scrollable {
 
         let lastTop = -1, lastLeft = -1;
         var links = elements.map(function(elm, i) {
-            var r = getRealRect(elm),
+            var r = rects[i],
                 z = getZIndex(elm);
             var left, width = Math.min(r.width, window.innerWidth);
             if (runtime.conf.hintAlign === "right") {
@@ -813,6 +849,42 @@ div.hint-scrollable {
         hintsHost.shadowRoot.appendChild(holder);
     }
 
+    function showTypeGroup(index) {
+        typeIndex = index;
+        prefix = "";
+        textFilter = "";
+        shiftKey = false;
+        altKey = false;
+        const [type, elements] = typeGroups[index];
+        placeHints(elements);
+        const next = typeGroups.length > 1 ? ` · ${htmlEncode(KeyboardUtils.decodeKeystroke(nextTypeKey))} next` : "";
+        self.statusLine = `${clickStatus} · ${type} (${elements.length})${next}`;
+    }
+
+    function showClickHints(elements, attrs) {
+        const previousType = typeGroups[typeIndex]?.[0];
+        typeGroups = [];
+        typeIndex = 0;
+        if (!elements.length) {
+            return 0;
+        }
+        if (attrs.groupByType ?? runtime.conf.hintGroupByType) {
+            clickStatus = self.statusLine;
+            const key = runtime.conf.hintNextTypeKey;
+            nextTypeKey = typeof key === "string" ? KeyboardUtils.encodeKeystroke(key) : "";
+            if (nextTypeKey.length !== 1 || ["<Esc>", "<Space>", "<Backspace>"].includes(key)
+                || characters.toLowerCase().includes(nextTypeKey.toLowerCase())
+                || /^<Alt-(.)>$/.test(key) && characters.toLowerCase().includes(key.slice(5, -1).toLowerCase())) {
+                nextTypeKey = KeyboardUtils.encodeKeystroke("<Tab>");
+            }
+            typeGroups = groupHintTargets(elements, runtime.conf.hintTypeOrder);
+            showTypeGroup(Math.max(0, typeGroups.findIndex(([type]) => type === previousType)));
+        } else {
+            placeHints(elements);
+        }
+        return elements.length;
+    }
+
     function createHintsForElements(elements, attrs) {
         attrs = attrs || {};
         for (var attr in attrs) {
@@ -821,10 +893,7 @@ div.hint-scrollable {
         self.statusLine = (attrs && attrs.statusLine) || "Hints to click";
 
         elements = filterInvisibleElements(elements);
-        if (elements.length > 0) {
-            placeHints(elements);
-        }
-        return elements.length;
+        return showClickHints(elements, attrs);
     }
 
     function createHintsForClick(cssSelector, attrs) {
@@ -854,11 +923,7 @@ div.hint-scrollable {
             elements = filterOverlapElements(elements);
         }
 
-        if (elements.length > 0) {
-            placeHints(elements);
-        }
-
-        return elements.length;
+        return showClickHints(elements, attrs);
     }
 
     function createHintsForTextNode(rxp, attrs) {
@@ -1021,7 +1086,7 @@ div.hint-scrollable {
      *
      * @param cssSelector `string or array of HTMLElement`, if `links` is a string, it will be used as css selector.
      * @param {function} onHintKey a callback function on hint keys pressed, called with `(element, shiftKey, altKey)`: `shiftKey` is true if any hint key was typed with Shift, `altKey` if any was typed with Alt. The default click ignores `altKey`.
-     * @param {object} [attrs=null] `active`: whether to activate the new tab when a link is opened, `tabbed`: whether to open a link in a new tab, `multipleHits`: whether to stay in hints mode after one hint is triggered, `statusLine`: the text to show on the status bar while the hints are open.
+     * @param {object} [attrs=null] `active`: whether to activate the new tab when a link is opened, `tabbed`: whether to open a link in a new tab, `multipleHits`: whether to stay in hints mode after one hint is triggered, `statusLine`: the text to show on the status bar while the hints are open, `groupByType`: override category grouping for this element picker.
      * @name Hints.create
      * @returns {Promise} which will be resolved how many hints are created.
      * @see Hints.dispatchMouseClick
@@ -1042,6 +1107,8 @@ div.hint-scrollable {
         _cssSelector = cssSelector;
         _onHintKey = onHintKey;
         _lastCreateAttrs = attrs || {};
+        typeGroups = [];
+        typeIndex = 0;
 
         var start = new Date().getTime();
         var found = createHints(cssSelector, attrs);
@@ -1091,6 +1158,20 @@ div.hint-scrollable {
 
     self.feedkeys = function(keys) {
         setTimeout(function() {
+            if (Mode.getCurrent() !== self) {
+                return;
+            }
+            const separator = keys.indexOf(":");
+            const type = keys.slice(0, separator);
+            if (separator !== -1 && hintTypes.includes(type)) {
+                const index = typeGroups.findIndex(([category]) => category === type);
+                if (index === -1) {
+                    hide();
+                    return;
+                }
+                showTypeGroup(index);
+                keys = keys.slice(separator + 1);
+            }
             prefix = keys.toUpperCase();
             handleHint();
         }, 1);
