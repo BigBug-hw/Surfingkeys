@@ -1,5 +1,4 @@
 import { RUNTIME, dispatchSKEvent } from './runtime.js';
-import Trie from './trie';
 import Mode from './mode';
 import KeyboardUtils from './keyboardUtils';
 import {
@@ -19,6 +18,7 @@ import {
     showBanner,
     showPopup,
     tabOpenLink,
+    unmapInMode,
 } from './utils.js';
 
 function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
@@ -121,9 +121,9 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
     }
 
     /**
-     * Map a key sequence to another in normal mode.
+     * Replace a normal-mode shortcut with a new key sequence.
      *
-     * @param {string} new_keystroke a key sequence to replace
+     * @param {string} new_keystroke the new key sequence
      * @param {string} old_keystroke a key sequence to be replaced
      * @param {regex} [domain=null] a Javascript regex pattern to identify the domains that this mapping works.
      * @param {string} [new_annotation=null] use it instead of the annotation from old_keystroke if provided.
@@ -131,7 +131,7 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
      * @example
      * map(';d', '<Ctrl-Alt-d>');
      */
-    function map(new_keystroke, old_keystroke, domain, new_annotation) {
+    function map(new_keystroke, old_keystroke, domain, new_annotation, replace = true) {
         if (_isDomainApplicable(domain)) {
             if (old_keystroke[0] === ':' && old_keystroke.length > 1) {
                 var cmdline = old_keystroke.substr(1);
@@ -139,10 +139,11 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
                     front.executeCommand(cmdline);
                 }, new_annotation ? parseAnnotation({ annotation: new_annotation }) : null, false);
                 normal.mappings.add(KeyboardUtils.encodeKeystroke(new_keystroke), keybound);
-            } else {
-                if (!mapInMode(normal, new_keystroke, old_keystroke, new_annotation) && old_keystroke in Mode.specialKeys) {
-                    Mode.specialKeys[old_keystroke].push(new_keystroke);
-                    dispatchSKEvent("front", ['addMapkey', "Mode", new_keystroke, old_keystroke]);
+            } else if (!mapInMode(normal, new_keystroke, old_keystroke, new_annotation, replace)) {
+                const specialKey = Object.keys(Mode.specialKeys).find(key => Mode.specialKeys[key].includes(old_keystroke));
+                if (specialKey) {
+                    Mode.mapSpecialKey(specialKey, new_keystroke, old_keystroke, replace);
+                    dispatchSKEvent("front", ['mapSpecialKey', specialKey, new_keystroke, old_keystroke, replace]);
                 } else {
                     LOG("warn", `${old_keystroke} not found in normal mode.`);
                 }
@@ -176,7 +177,10 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
     }
 
     /**
-     * Unmap all keybindings except those specified.
+     * Unmap Normal and Insert shortcuts except those specified.
+     *
+     * Use nunmapAllExcept, iunmapAllExcept, vunmapAllExcept, cunmapAllExcept,
+     * or lunmapAllExcept to filter one mode. Each takes the same arguments.
      *
      * @param {array} keystrokes the keybindings you want to keep.
      * @param {regex} [domain=null] a Javascript regex pattern to identify the domains that this mapping will be removed.
@@ -187,28 +191,58 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
      */
     function unmapAllExcept(keystrokes, domain) {
         if (_isDomainApplicable(domain)) {
-            var modes = [normal, insert];
-            modes.forEach(function(mode) {
-                var _mappings = new Trie();
-                keystrokes = keystrokes || [];
-                for (var i = 0, il = keystrokes.length; i < il; i++) {
-                    var ks = KeyboardUtils.encodeKeystroke(keystrokes[i]);
-                    var node = mode.mappings.find(ks);
-                    if (node) {
-                        _mappings.add(ks, node.meta);
-                    }
-                }
-                delete mode.mappings;
-                mode.mappings = _mappings;
-                mode.map_node = _mappings;
-            });
+            unmapInMode(normal, keystrokes);
+            unmapInMode(insert, keystrokes);
+        }
+    }
+
+    function nunmapAllExcept(keystrokes, domain) {
+        if (_isDomainApplicable(domain)) {
+            unmapInMode(normal, keystrokes);
+        }
+    }
+
+    function iunmapAllExcept(keystrokes, domain) {
+        if (_isDomainApplicable(domain)) {
+            unmapInMode(insert, keystrokes);
+        }
+    }
+
+    function vunmapAllExcept(keystrokes, domain) {
+        if (_isDomainApplicable(domain)) {
+            unmapInMode(visual, keystrokes);
+        }
+    }
+
+    function lunmapAllExcept(keystrokes, domain) {
+        if (_isDomainApplicable(domain)) {
+            normal.configureLurk(mode => unmapInMode(mode, keystrokes));
+        }
+    }
+
+    function cunmapAllExcept(keystrokes, domain) {
+        if (_isDomainApplicable(domain)) {
+            dispatchSKEvent("front", ['unmapAllExcept', "Omnibar", keystrokes]);
+        }
+    }
+
+    /**
+     * Remove an Omnibar shortcut.
+     *
+     * @param {string} keystroke the key sequence to remove.
+     * @param {regex} [domain=null] limit the change to matching sites.
+     * @see unmap
+     */
+    function cunmap(keystroke, domain) {
+        if (_isDomainApplicable(domain)) {
+            dispatchSKEvent("front", ['unmap', "Omnibar", keystroke]);
         }
     }
 
     /**
      * Map a key sequence to another in insert mode.
      *
-     * @param {string} new_keystroke a key sequence to replace
+     * @param {string} new_keystroke the new key sequence
      * @param {string} old_keystroke a key sequence to be replaced
      * @param {regex} [domain=null] a Javascript regex pattern to identify the domains that this mapping works.
      * @param {string} [new_annotation=null] use it instead of the annotation from old_keystroke if provided.
@@ -236,25 +270,25 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
     }
 
     /**
-     * Map a key sequence to another in omnibar.
+     * Replace an Omnibar shortcut with a new key sequence.
      *
-     * @param {string} new_keystroke a key sequence to replace
+     * @param {string} new_keystroke the new key sequence
      * @param {string} old_keystroke a key sequence to be replaced
      * @param {regex} [domain=null] a Javascript regex pattern to identify the domains that this mapping works.
      * @param {string} [new_annotation=null] use it instead of the annotation from old_keystroke if provided.
      *
      * @see map
      */
-    function cmap(new_keystroke, old_keystroke, domain, new_annotation) {
+    function cmap(new_keystroke, old_keystroke, domain, new_annotation, replace = true) {
         if (_isDomainApplicable(domain)) {
-            dispatchSKEvent("front", ['addMapkey', "Omnibar", new_keystroke, old_keystroke]);
+            dispatchSKEvent("front", ['addMapkey', "Omnibar", new_keystroke, old_keystroke, new_annotation, replace]);
         }
     }
 
     /**
-     * Map a key sequence to another in visual mode.
+     * Replace a visual-mode shortcut with a new key sequence.
      *
-     * @param {string} new_keystroke a key sequence to replace
+     * @param {string} new_keystroke the new key sequence
      * @param {string} old_keystroke a key sequence to be replaced
      * @param {regex} [domain=null] a Javascript regex pattern to identify the domains that this mapping works.
      * @param {string} [new_annotation=null] use it instead of the annotation from old_keystroke if provided.
@@ -263,7 +297,7 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
      */
     function vmap(new_keystroke, old_keystroke, domain, new_annotation) {
         if (_isDomainApplicable(domain)) {
-            mapInMode(visual, new_keystroke, old_keystroke, new_annotation);
+            mapInMode(visual, new_keystroke, old_keystroke, new_annotation, true);
         }
     }
 
@@ -284,7 +318,7 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
     /**
      * Map a key sequence to another in lurk mode.
      *
-     * @param {string} new_keystroke a key sequence to replace
+     * @param {string} new_keystroke the new key sequence
      * @param {string} old_keystroke a key sequence to be replaced
      * @param {regex} [domain=null] a Javascript regex pattern to identify the domains that this mapping works.
      * @param {string} [new_annotation=null] use it instead of the annotation from old_keystroke if provided.
@@ -293,7 +327,7 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
      */
     function lmap(new_keystroke, old_keystroke, domain, new_annotation) {
         if (_isDomainApplicable(domain)) {
-            normal.addLurkMap(new_keystroke, old_keystroke);
+            normal.configureLurk(mode => mapInMode(mode, new_keystroke, old_keystroke, new_annotation, true));
         }
     }
 
@@ -412,16 +446,19 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
         });
     }
 
+    const unmapping = {
+        unmap, iunmap, vunmap, cunmap, unmapAllExcept,
+        nunmapAllExcept, iunmapAllExcept, vunmapAllExcept, cunmapAllExcept, lunmapAllExcept,
+    };
+
     initSKFunctionListener("api", {
+        ...unmapping,
+        cmap,
         addSearchAlias,
         imap,
         map,
         lmap,
         vmap,
-        unmap,
-        unmapAllExcept,
-        iunmap,
-        vunmap,
         removeSearchAlias,
         searchSelectedWith,
         "clipboard:write": clipboard.write,
@@ -489,10 +526,7 @@ function createAPI(clipboard, insert, normal, hints, visual, front, browser) {
         getClickableElements,
         lmap,
         map,
-        unmap,
-        unmapAllExcept,
-        iunmap,
-        vunmap,
+        ...unmapping,
         mapkey,
         readText: browser.readText,
         removeSearchAlias,

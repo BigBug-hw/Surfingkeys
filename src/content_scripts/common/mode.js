@@ -93,6 +93,17 @@ Mode.specialKeys = {
     "<Esc>": ["<Esc>"]
 };
 
+Mode.mapSpecialKey = function(specialKey, newKey, oldKey, replace) {
+    const keys = Mode.specialKeys[specialKey];
+    const index = keys.indexOf(oldKey);
+    if (replace && newKey !== oldKey && index !== -1) {
+        keys.splice(index, 1);
+    }
+    if (!keys.includes(newKey)) {
+        keys.push(newKey);
+    }
+};
+
 Mode.isSpecialKeyOf = function(specialKey, keyToCheck) {
     return (-1 !== Mode.specialKeys[specialKey].indexOf(KeyboardUtils.decodeKeystroke(keyToCheck)));
 };

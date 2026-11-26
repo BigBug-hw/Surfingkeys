@@ -32,11 +32,13 @@ function createFront(insert, normal, hints, visual, browser) {
     }
 
     var frontendPromise;
+    let frontendReady = false;
 
     function newFrontEnd() {
         frontendPromise = new Promise(function (resolve, reject) {
             createUiHost(browser, (res) => {
                 resolve(res);
+                frontendReady = true;
                 applyUserSettings();
             });
         });
@@ -70,10 +72,9 @@ function createFront(insert, normal, hints, visual, browser) {
 
     function applyUICommand(cmd) {
         _uiUserSettings.push(cmd);
-        if (frontendPromise) {
-            frontendPromise.then(function() {
-                self.command(cmd);
-            });
+        // Initialization replays this queue, including commands added while the UI loads.
+        if (frontendReady) {
+            self.command(cmd);
         }
     }
 
@@ -530,13 +531,24 @@ function createFront(insert, normal, hints, visual, browser) {
             dispatchSKEvent('settingsFromSnippetsLoaded');
         },
         querySelectedWord,
-        addMapkey: (mode, new_keystroke, old_keystroke) => {
+        addMapkey: (mode, new_keystroke, old_keystroke, new_annotation, replace) => {
             applyUICommand({
                 action: 'addMapkey',
                 mode: mode,
                 new_keystroke: new_keystroke,
-                old_keystroke: old_keystroke
+                old_keystroke: old_keystroke,
+                new_annotation,
+                replace
             });
+        },
+        mapSpecialKey: (specialKey, newKey, oldKey, replace) => {
+            applyUICommand({action: 'mapSpecialKey', specialKey, newKey, oldKey, replace});
+        },
+        unmap: (mode, keystroke) => {
+            applyUICommand({action: 'unmap', mode, keystroke});
+        },
+        unmapAllExcept: (mode, keystrokes) => {
+            applyUICommand({action: 'unmapAllExcept', mode, keystrokes});
         },
         addVimMap: (lhs, rhs, ctx) => {
             applyUICommand({
@@ -828,6 +840,7 @@ function createFront(insert, normal, hints, visual, browser) {
         } else if (_message.action === "performInlineQueryResult") {
             _showQueryResult(_message.pos, _message.result);
         } else if (_message.action === "frontendDestroyed") {
+            frontendReady = false;
             frontendPromise = undefined;
         } else if (_active) {
             if (_callbacks[_message.id]) {

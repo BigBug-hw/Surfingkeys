@@ -18,15 +18,15 @@ function isInUIFrame() {
     return !document.location.href.startsWith("chrome://") && document.location.href.indexOf(EXTENSION_ROOT_URL) === 0;
 }
 
-    function _isDomainApplicable(domain) {
-        return !domain || domain.test(document.location.href) || domain.test(window.origin);
-    }
+function _isDomainApplicable(domain) {
+    return !domain || domain.test(document.location.href) || domain.test(window.origin);
+}
 
-    function cmap(new_keystroke, old_keystroke, domain, new_annotation) {
-        if (_isDomainApplicable(domain)) {
-            dispatchSKEvent("front", ['addMapkey', "Omnibar", new_keystroke, old_keystroke]);
-        }
+function cmap(new_keystroke, old_keystroke, domain, new_annotation) {
+    if (_isDomainApplicable(domain)) {
+        dispatchSKEvent('api', ['cmap', new_keystroke, old_keystroke, null, new_annotation]);
     }
+}
 
 const userDefinedFunctions = {};
 function mapkey(keys, annotation, jscode, options) {
@@ -165,6 +165,12 @@ function createCssSelectorForElements(cssSelector, elements) {
     return elements.length;
 }
 
+function unmapKeys(action, keys, domain) {
+    if (_isDomainApplicable(domain)) {
+        dispatchSKEvent('api', [action, keys]);
+    }
+}
+
 const api = {
     RUNTIME,
     aceVimMap,
@@ -182,18 +188,16 @@ const api = {
     vmapkey,
     map,
     mapkey,
-    unmap: (keystroke, domain) => {
-        dispatchSKEvent('api', ['unmap', keystroke, domain]);
-    },
-    iunmap: (keystroke, domain) => {
-        dispatchSKEvent('api', ['iunmap', keystroke, domain]);
-    },
-    vunmap: (keystroke, domain) => {
-        dispatchSKEvent('api', ['vunmap', keystroke, domain]);
-    },
-    unmapAllExcept: (keystrokes, domain) => {
-        dispatchSKEvent('api', ['unmapAllExcept', keystrokes, domain]);
-    },
+    unmap: (keys, domain) => unmapKeys('unmap', keys, domain),
+    iunmap: (keys, domain) => unmapKeys('iunmap', keys, domain),
+    vunmap: (keys, domain) => unmapKeys('vunmap', keys, domain),
+    cunmap: (keys, domain) => unmapKeys('cunmap', keys, domain),
+    unmapAllExcept: (keys, domain) => unmapKeys('unmapAllExcept', keys, domain),
+    nunmapAllExcept: (keys, domain) => unmapKeys('nunmapAllExcept', keys, domain),
+    iunmapAllExcept: (keys, domain) => unmapKeys('iunmapAllExcept', keys, domain),
+    vunmapAllExcept: (keys, domain) => unmapKeys('vunmapAllExcept', keys, domain),
+    cunmapAllExcept: (keys, domain) => unmapKeys('cunmapAllExcept', keys, domain),
+    lunmapAllExcept: (keys, domain) => unmapKeys('lunmapAllExcept', keys, domain),
     readText: (text, options) => {
         dispatchSKEvent('api', ['readText', text, options]);
     },

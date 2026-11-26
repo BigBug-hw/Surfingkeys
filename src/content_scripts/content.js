@@ -48,7 +48,7 @@ function applyBasicMappings(api, normal, mappings) {
         } else if (originMappings.hasOwnProperty(originKey)) {
             normal.mappings.add(newKey, originMappings[originKey]);
         } else {
-            api.map(newKey, originKey);
+            api.map(newKey, originKey, null, null, false);
         }
     }
 }

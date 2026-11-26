@@ -62,6 +62,17 @@ Trie.prototype = {
         return found;
     },
 
+    removeWord: function(word) {
+        const node = this.find(word);
+        if (word && node?.meta) {
+            if (Object.keys(node).some(key => key.length === 1)) {
+                delete node.meta;
+            } else {
+                this.remove(word);
+            }
+        }
+    },
+
     getWords: function(prefix, withoutStem) {
         var ret = [], prefix = (prefix || "") + (withoutStem ? "" : (this.stem || ""));
         if (this.hasOwnProperty('meta')) {

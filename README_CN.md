@@ -274,10 +274,15 @@ Surfingkeys有三种模式：normal，visual和insert。
 
 ![search_engine](https://cloud.githubusercontent.com/assets/288207/17644214/759ef1d4-61b3-11e6-9bd9-70c38c8b80e0.gif)
 
-`cmap`用于搜索栏修改按键，如：
+`api.cmap(新按键, 旧按键)` 会把搜索栏快捷键移到新的按键上。`api.map` 和 `api.vmap` 分别在 Normal 和 Visual 模式下执行相同的替换。
 
-    api.cmap('<Ctrl-n>', '<Tab>');
-    api.cmap('<Ctrl-p>', '<Shift-Tab>');
+```js
+api.cmap('<Ctrl-n>', '<Tab>');
+api.cmap('<Ctrl-p>', '<Shift-Tab>');
+api.cunmap('<Ctrl-d>', /example\.com/);
+```
+
+按模式保留指定快捷键时，使用 `nunmapAllExcept`（Normal）、`iunmapAllExcept`（Insert）、`vunmapAllExcept`（Visual）、`cunmapAllExcept`（Omnibar）或 `lunmapAllExcept`（Lurk）。这些接口接受要保留的按键数组及可选的网址正则，传入空数组可清除该模式的快捷键映射。`unmapAllExcept` 仍同时作用于 Normal 和 Insert。
 
 ### 添加书签
 `ab`可以把当前页加入书签。按`ab`后，搜索栏会弹出来让你选择放到哪个目录。如果你希望放到一个新建目录下面，可以输入新的目录名，**并以`/`结尾**，比如我选中了`/Bookmarks Bar/tool/`，然后在后面输入`abc/`，会把当前页加到`/Bookmarks Bar/tool/abc/`这个目录里。如果`abc`后面没有`/`，`abc`会被当作新建书签的标题保存。

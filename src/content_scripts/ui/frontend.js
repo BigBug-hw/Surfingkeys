@@ -12,7 +12,8 @@ import {
     refreshHints,
     rotateInput,
     setSanitizedContent,
-    mapInMode
+    mapInMode,
+    unmapInMode,
 } from '../common/utils.js';
 import { RUNTIME, runtime } from '../common/runtime.js';
 import KeyboardUtils from '../common/keyboardUtils';
@@ -455,10 +456,25 @@ const Front = (function() {
         hints.setCharacters(message.characters);
     };
     _actions['addMapkey'] = function (message) {
-        if (message.old_keystroke in Mode.specialKeys) {
-            Mode.specialKeys[message.old_keystroke].push(message.new_keystroke);
-        } else if (modes.hasOwnProperty(message.mode)) {
-            mapInMode(modes[message.mode], message.new_keystroke, message.old_keystroke);
+        const {mode, new_keystroke, old_keystroke, new_annotation, replace} = message;
+        if (Object.hasOwn(modes, mode)) {
+            mapInMode(modes[mode], new_keystroke, old_keystroke, new_annotation, replace);
+        }
+    };
+    _actions['mapSpecialKey'] = function ({specialKey, newKey, oldKey, replace}) {
+        if (Object.hasOwn(Mode.specialKeys, specialKey)) {
+            Mode.mapSpecialKey(specialKey, newKey, oldKey, replace);
+        }
+    };
+    _actions['unmap'] = function ({mode, keystroke}) {
+        if (Object.hasOwn(modes, mode)) {
+            Mode.finish(modes[mode]);
+            modes[mode].mappings.removeWord(KeyboardUtils.encodeKeystroke(keystroke));
+        }
+    };
+    _actions['unmapAllExcept'] = function ({mode, keystrokes}) {
+        if (Object.hasOwn(modes, mode)) {
+            unmapInMode(modes[mode], keystrokes);
         }
     };
     _actions['addVimMap'] = function (message) {

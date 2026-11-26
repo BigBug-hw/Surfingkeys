@@ -8,7 +8,6 @@ import {
     isElementClickable,
     isElementPartiallyInViewport,
     isInUIFrame,
-    mapInMode,
     scrollIntoViewIfNeeded,
     setSanitizedContent,
     showBanner,
@@ -147,11 +146,8 @@ function createNormal(insert) {
         if (!_lurk) {
             self.exit();
             _lurk = createLurk(self);
-            _lurkMaps.forEach((keymap) => {
-                mapInMode(_lurk, keymap[0], keymap[1]);
-                _lurk.mappings.remove(KeyboardUtils.encodeKeystroke(keymap[1]));
-            });
-            _lurkMaps = undefined;
+            _lurkSettings.forEach(apply => apply(_lurk));
+            _lurkSettings.length = 0;
             _lurk.enter(0, true);
         } else if (Mode.getCurrent() !== _lurk) {
             state = "enabled";
@@ -170,9 +166,13 @@ function createNormal(insert) {
     self.getLurkMode = () => {
         return _lurk;
     };
-    let _lurkMaps = [];
-    self.addLurkMap = (new_keystroke, old_keystroke) => {
-        _lurkMaps.push([new_keystroke, old_keystroke]);
+    const _lurkSettings = [];
+    self.configureLurk = apply => {
+        if (_lurk) {
+            apply(_lurk);
+        } else {
+            _lurkSettings.push(apply);
+        }
     };
 
     var _once = false;

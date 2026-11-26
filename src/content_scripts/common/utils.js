@@ -1,4 +1,6 @@
 import DOMPurify from "dompurify";
+import { LOG } from '../../common/utils.js';
+import Trie from './trie';
 import KeyboardUtils from './keyboardUtils';
 import { RUNTIME, dispatchSKEvent, runtime, skEventName } from './runtime.js';
 
@@ -883,23 +885,56 @@ function parseAnnotation(ag) {
     return ag;
 }
 
-function mapInMode(mode, nks, oks, new_annotation) {
+function mapInMode(mode, nks, oks, new_annotation, replace = false) {
     oks = KeyboardUtils.encodeKeystroke(oks);
-    var old_map = mode.mappings.find(oks);
-    if (old_map) {
-        nks = KeyboardUtils.encodeKeystroke(nks);
-        mode.mappings.remove(nks);
-        // meta.word need to be new
-        var meta = Object.assign({}, old_map.meta);
-        if (new_annotation) {
-            meta = Object.assign(meta, parseAnnotation({ annotation: new_annotation }));
-        }
-        mode.mappings.add(nks, meta);
-        if (!isInUIFrame()) {
-            dispatchSKEvent("front", ['addMapkey', mode.name, nks, oks]);
+    nks = KeyboardUtils.encodeKeystroke(nks);
+    const oldMapping = mode.mappings.find(oks)?.meta;
+    if (!nks || !oks || !oldMapping) {
+        return false;
+    }
+
+    if (replace) {
+        for (let length = 1; length < nks.length; length++) {
+            const prefix = nks.slice(0, length);
+            if (prefix !== oks && mode.mappings.find(prefix)?.meta) {
+                LOG("warn", `${prefix} precedes ${nks}.`);
+                return true;
+            }
         }
     }
-    return old_map;
+
+    const meta = { ...oldMapping };
+    if (new_annotation) {
+        parseAnnotation(Object.assign(meta, { annotation: new_annotation }));
+    }
+    if (replace && nks !== oks) {
+        mode.mappings.removeWord(oks);
+    }
+    if (nks !== oks) {
+        mode.mappings.remove(nks);
+    }
+    mode.mappings.add(nks, meta);
+    if (!isInUIFrame()) {
+        dispatchSKEvent("front", ['addMapkey', mode.name, nks, oks, new_annotation, replace]);
+    }
+    return true;
+}
+
+function unmapInMode(mode, keystrokes) {
+    const mappings = new Trie();
+    for (const keystroke of keystrokes || []) {
+        const key = KeyboardUtils.encodeKeystroke(keystroke);
+        const meta = mode.mappings.find(key)?.meta;
+        if (meta) {
+            mappings.add(key, meta);
+        }
+    }
+    mode.mappings = mappings;
+    mode.map_node = mappings;
+    mode.pendingMap = null;
+    if (mode.repeats !== undefined) {
+        mode.repeats = "";
+    }
 }
 
 function getAnnotations(mappings) {
@@ -1227,6 +1262,7 @@ export {
     llmRequest,
     locateFocusNode,
     mapInMode,
+    unmapInMode,
     openOmnibar,
     parseAnnotation,
     refreshHints,

@@ -24,14 +24,14 @@ import {
 export default function(api, clipboard, insert, normal, hints, visual, front, browser) {
     const {
         addSearchAlias,
-        cmap,
-        map,
         mapkey,
         imapkey,
         readText,
         vmapkey,
         searchSelectedWith,
     } = api;
+
+    const map = (newKey, oldKey, domain, annotation) => api.map(newKey, oldKey, domain, annotation, false);
 
     mapkey('[[', '#1Click on the previous link on current page', hints.previousPage);
     mapkey(']]', '#1Click on the next link on current page', hints.nextPage);
@@ -561,8 +561,8 @@ export default function(api, clipboard, insert, normal, hints, visual, front, br
     });
 
     map('<Ctrl-i>', 'I');
-    cmap('<ArrowDown>', '<Ctrl-n>');
-    cmap('<ArrowUp>', '<Ctrl-p>');
+    api.cmap('<ArrowDown>', '<Ctrl-n>', null, null, false);
+    api.cmap('<ArrowUp>', '<Ctrl-p>', null, null, false);
     mapkey('q', '#1Click on an Image or a button', function() {
         hints.create("img, button", hints.dispatchMouseClick);
     });

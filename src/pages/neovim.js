@@ -41,7 +41,7 @@ document.addEventListener("surfingkeys:defaultSettingsLoaded", function(evt) {
                     document.body.classList.remove("neovim-disabled");
                     normal.exit();
                 });
-                api.map('i', '<Alt-i>');
+                api.map('i', '<Alt-i>', null, null, false);
                 nvim.connect(resp.url);
             }
         });
